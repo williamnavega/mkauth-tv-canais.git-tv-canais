@@ -258,6 +258,23 @@ function tv_app_db()
     return $db;
 }
 
+function tv_column_exists(mysqli $db, $table, $column)
+{
+    $params = array($table, $column);
+    $row = tv_one($db, 'SELECT COUNT(*) qty FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?', 'ss', $params);
+    return $row && (int) $row['qty'] > 0;
+}
+
+function tv_add_column_if_missing(mysqli $db, $table, $column, $definition)
+{
+    if (!tv_column_exists($db, $table, $column)) {
+        $sql = 'ALTER TABLE `' . $db->real_escape_string($table) . '` ADD COLUMN `' . $db->real_escape_string($column) . '` ' . $definition;
+        if (!$db->query($sql)) {
+            throw new RuntimeException('Falha ao migrar coluna ' . $table . '.' . $column . ': ' . $db->error);
+        }
+    }
+}
+
 function tv_mk_db()
 {
     static $db = null;
@@ -323,6 +340,9 @@ function tv_migrate(mysqli $db)
         KEY idx_logs_created (created_at),
         KEY idx_logs_client (client_tv_plan_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+
+    tv_add_column_if_missing($db, 'client_tv_plans', 'max_connections_override', "INT NOT NULL DEFAULT 0 AFTER sync_enabled");
+    tv_add_column_if_missing($db, 'client_tv_plans', 'access_outputs_override', "VARCHAR(255) NOT NULL DEFAULT '' AFTER max_connections_override");
 }
 
 function tv_json($ok, $payload, $status = 200)
@@ -585,6 +605,38 @@ function tv_link($linkId)
     return tv_one($db, 'SELECT * FROM client_tv_plans WHERE id = ? LIMIT 1', 'i', $params);
 }
 
+function tv_effective_plan_for_link(array $plan, array $link)
+{
+    $effective = $plan;
+    $connections = isset($link['max_connections_override']) ? (int) $link['max_connections_override'] : 0;
+    if ($connections > 0) {
+        $effective['max_connections'] = $connections;
+    }
+    $outputs = isset($link['access_outputs_override']) ? trim((string) $link['access_outputs_override']) : '';
+    if ($outputs !== '') {
+        $effective['access_outputs'] = $outputs;
+    }
+    return $effective;
+}
+
+function tv_playlist_url(array $settings, $username, $password, $output = 'hls')
+{
+    $username = trim((string) $username);
+    $password = trim((string) $password);
+    if ($username === '' || $password === '') {
+        return '';
+    }
+    $base = rtrim((string) $settings['xui_base_url'], '/');
+    if ($base === '') {
+        return '';
+    }
+    $selected = strtolower(trim((string) $output));
+    if (!in_array($selected, array('hls', 'ts', 'm3u8'), true)) {
+        $selected = 'hls';
+    }
+    return $base . '/playlist/' . rawurlencode($username) . '/' . rawurlencode($password) . '/m3u?output=' . rawurlencode($selected);
+}
+
 function tv_dashboard()
 {
     $app = tv_app_db();
@@ -603,7 +655,7 @@ function tv_dashboard()
     if (!$kpis) {
         $kpis = array('linked' => 0, 'active' => 0, 'blocked' => 0, 'failed' => 0);
     }
-    $linked = tv_rows($app, "SELECT ctp.*, p.name plan_name, p.max_connections
+    $linked = tv_rows($app, "SELECT ctp.*, p.name plan_name, p.max_connections, p.access_outputs
         FROM client_tv_plans ctp
         JOIN tv_plans p ON p.id = ctp.tv_plan_id
         ORDER BY ctp.updated_at DESC
@@ -615,9 +667,17 @@ function tv_dashboard()
     $clients = tv_clients_map($clientIds);
     foreach ($linked as $idx => $row) {
         $client = isset($clients[(int) $row['mk_client_id']]) ? $clients[(int) $row['mk_client_id']] : array();
+        $planRow = array(
+            'max_connections' => isset($row['max_connections']) ? $row['max_connections'] : 1,
+            'access_outputs' => isset($row['access_outputs']) ? $row['access_outputs'] : '',
+        );
+        $effective = tv_effective_plan_for_link($planRow, $row);
         $linked[$idx]['client_name'] = isset($client['nome']) ? $client['nome'] : '';
         $linked[$idx]['client_plan'] = isset($client['plano']) ? $client['plano'] : '';
         $linked[$idx]['mkauth_status'] = $client ? tv_client_status($client, $settings) : array('label' => 'Cliente ausente');
+        $linked[$idx]['effective_connections'] = isset($effective['max_connections']) ? (int) $effective['max_connections'] : 1;
+        $linked[$idx]['effective_outputs'] = isset($effective['access_outputs']) ? (string) $effective['access_outputs'] : '';
+        $linked[$idx]['playlist_url'] = tv_playlist_url($settings, isset($row['xui_username']) ? $row['xui_username'] : '', isset($row['xui_password']) ? $row['xui_password'] : '', 'hls');
     }
     $logs = tv_rows($app, 'SELECT id, action, result, message, created_at FROM sync_logs ORDER BY id DESC LIMIT 30');
     return array(
@@ -926,6 +986,7 @@ function tv_sync_client($linkId)
     if (!$plan) {
         throw new RuntimeException('Plano de TV nao encontrado.');
     }
+    $plan = tv_effective_plan_for_link($plan, $link);
     $settings = tv_settings();
     if (!tv_configured($settings)) {
         $params = array('pending_config', 'Integracao de canais ainda nao configurada', (int) $link['id']);

@@ -105,17 +105,32 @@
     return '<td' + (className ? ' class="' + className + '"' : '') + '>' + escapeHtml(value == null || value === '' ? '--' : value) + '</td>';
   }
 
+  function linkInput(selectorPrefix, id) {
+    return document.querySelector('[' + selectorPrefix + '="' + String(id).replace(/"/g, '\\"') + '"]');
+  }
+
+  function playlistCell(row) {
+    const url = row.playlist_url || '';
+    if (!url) return '<td class="is-muted">--</td>';
+    return '<td><div class="tv-playlist-actions">' +
+      '<input class="tv-playlist-input" readonly value="' + escapeHtml(url) + '">' +
+      '<button type="button" title="Copiar lista" data-copy-playlist="' + escapeHtml(url) + '"><i class="bi-clipboard"></i></button>' +
+      '<a class="tv-table-button" title="Abrir lista" target="_blank" rel="noopener" href="' + escapeHtml(url) + '"><i class="bi-box-arrow-up-right"></i></a>' +
+      '</div></td>';
+  }
+
   function renderLinked(rows) {
-    table('linked-table', ['Cliente', 'Login', 'Plano TV', 'Plano MK', 'Status XUI', 'Status MK', 'Linha', 'Ultima sync', 'Acoes'], rows, (row) => [
+    table('linked-table', ['Cliente', 'Login', 'Plano TV', 'Status XUI', 'Telas', 'Outputs', 'Lista', 'Linha', 'Ultima sync', 'Acoes'], rows, (row) => [
       td(row.client_name),
       td(row.mk_login, 'is-muted'),
       td(row.plan_name),
-      td(row.client_plan, 'is-muted'),
       '<td>' + pill(row.status, row.status) + '</td>',
-      '<td>' + escapeHtml(row.mkauth_status ? row.mkauth_status.label : '--') + '</td>',
+      '<td><input class="tv-mini-input" type="number" min="0" value="' + escapeHtml(row.max_connections_override && Number(row.max_connections_override) > 0 ? row.max_connections_override : row.effective_connections || '') + '" data-link-connections="' + escapeHtml(row.id) + '"></td>',
+      '<td><input class="tv-outputs-input" type="text" value="' + escapeHtml(row.access_outputs_override || row.effective_outputs || '') + '" data-link-outputs="' + escapeHtml(row.id) + '"></td>',
+      playlistCell(row),
       td(row.xui_line_id || '--', 'is-muted'),
       td(row.last_sync_at || '--', 'is-muted'),
-      '<td><button type="button" data-sync-link="' + escapeHtml(row.id) + '"><i class="bi-arrow-repeat"></i></button></td>'
+      '<td><div class="tv-row-actions"><button type="button" title="Salvar e sincronizar" data-save-link="' + escapeHtml(row.id) + '"><i class="bi-check2-circle"></i></button><button type="button" title="Sincronizar" data-sync-link="' + escapeHtml(row.id) + '"><i class="bi-arrow-repeat"></i></button></div></td>'
     ]);
   }
 
@@ -318,6 +333,38 @@
   }
 
   document.addEventListener('click', function (event) {
+    const copyButton = event.target.closest('[data-copy-playlist]');
+    if (copyButton) {
+      const url = copyButton.getAttribute('data-copy-playlist') || '';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => setStatus(true, 'Lista copiada.')).catch(() => setStatus(false, 'Nao foi possivel copiar a lista.'));
+      } else {
+        setStatus(false, 'Copie a lista pelo campo de texto.');
+      }
+      return;
+    }
+
+    const saveButton = event.target.closest('[data-save-link]');
+    if (saveButton) {
+      const id = saveButton.getAttribute('data-save-link');
+      const connections = linkInput('data-link-connections', id);
+      const outputs = linkInput('data-link-outputs', id);
+      post('update_client_tv', {
+        link_id: id,
+        max_connections_override: connections ? connections.value : '0',
+        access_outputs_override: outputs ? outputs.value : '',
+        sync_enabled: '1',
+        sync_now: '1'
+      })
+        .then((data) => {
+          const sync = data.sync || {};
+          setStatus(true, sync.message || data.message || 'Cliente TV atualizado.');
+          load();
+        })
+        .catch((error) => setStatus(false, error.message));
+      return;
+    }
+
     const button = event.target.closest('[data-sync-link]');
     if (!button) return;
     post('sync_client', { link_id: button.getAttribute('data-sync-link') })

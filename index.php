@@ -8,7 +8,7 @@ if (!isset($Manifest)) {
     $Manifest = json_decode((string) @file_get_contents(__DIR__ . '/manifest.json'));
 }
 if (!$Manifest) {
-    $Manifest = (object) array('name' => 'TV Canais', 'version' => '1.0.11');
+    $Manifest = (object) array('name' => 'TV Canais', 'version' => '1.0.12');
 }
 require_once __DIR__ . '/lib.php';
 $LicenseStatus = tv_public_license_status(tv_license_status());

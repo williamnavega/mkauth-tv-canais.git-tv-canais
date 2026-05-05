@@ -430,7 +430,7 @@ body {
 
 .tv-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 1280px;
   border-collapse: collapse;
   background: #ffffff;
 }
@@ -469,6 +469,62 @@ body {
   min-height: 30px;
   padding: 0 8px;
   cursor: pointer;
+}
+
+.tv-row-actions,
+.tv-playlist-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tv-mini-input,
+.tv-outputs-input,
+.tv-playlist-input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--tv-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--tv-text);
+  font-size: 13px;
+  outline: none;
+}
+
+.tv-mini-input {
+  max-width: 74px;
+  padding: 0 8px;
+}
+
+.tv-outputs-input {
+  min-width: 110px;
+  padding: 0 10px;
+}
+
+.tv-playlist-input {
+  min-width: 280px;
+  padding: 0 10px;
+  color: var(--tv-muted);
+}
+
+.tv-table-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  min-height: 30px;
+  border: 1px solid var(--tv-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--tv-text);
+  text-decoration: none;
+}
+
+.tv-table button:hover,
+.tv-table-button:hover {
+  border-color: rgba(39, 110, 241, 0.38);
+  color: var(--tv-blue);
 }
 
 .tv-pill {

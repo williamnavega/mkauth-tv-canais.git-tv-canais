@@ -134,6 +134,29 @@ try {
         tv_json(true, tv_sync_client($linkId));
     }
 
+    if ($action === 'update_client_tv') {
+        $db = tv_app_db();
+        if (!$db) {
+            throw new RuntimeException('Banco do addon indisponivel.');
+        }
+        $linkId = (int) tv_post('link_id', '0');
+        $link = tv_link($linkId);
+        if (!$link) {
+            throw new RuntimeException('Vinculo nao encontrado.');
+        }
+        $connections = max(0, (int) tv_post('max_connections_override', '0'));
+        $outputs = implode(',', tv_csv_ints(tv_post('access_outputs_override', '')));
+        $syncEnabled = tv_post('sync_enabled', '1') === '1' ? 1 : 0;
+        $params = array($connections, $outputs, $syncEnabled, $linkId);
+        tv_exec($db, 'UPDATE client_tv_plans SET max_connections_override = ?, access_outputs_override = ?, sync_enabled = ?, updated_at = NOW() WHERE id = ?', 'isii', $params);
+        tv_log($linkId, (int) $link['mk_client_id'], 'update_client_tv', 'saved', 'Ajustes do cliente TV salvos.');
+        $sync = null;
+        if (tv_post('sync_now', '1') === '1') {
+            $sync = tv_sync_client($linkId);
+        }
+        tv_json(true, array('message' => 'Cliente TV atualizado.', 'sync' => $sync));
+    }
+
     if ($action === 'sync_all') {
         $db = tv_app_db();
         if (!$db) {

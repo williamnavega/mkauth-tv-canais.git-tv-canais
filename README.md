@@ -1,6 +1,6 @@
-# TV XUI One para MK-Auth
+# TV Canais para MK-Auth
 
-Addon nativo para MK-Auth que permite ao agente escolher um cliente, adicionar um plano extra de TV e sincronizar a linha diretamente com o XUI One.
+Addon nativo para MK-Auth que permite ao agente escolher um cliente, adicionar um plano extra de TV e sincronizar a linha diretamente com o painel de TV.
 
 ## Fluxo
 
@@ -10,6 +10,8 @@ Addon nativo para MK-Auth que permite ao agente escolher um cliente, adicionar u
 4. Vincule o cliente ao plano adicional de TV.
 5. O addon cria ou atualiza a linha no XUI.
 6. Quando o cliente bloquear no MK-Auth, o addon bloqueia tambem no XUI.
+7. Ajuste telas/conexoes e outputs por cliente quando precisar de uma regra diferente do plano.
+8. Copie a lista gerada do cliente direto em **Clientes TV** quando a linha estiver sincronizada.
 
 ## Estrutura
 
@@ -24,7 +26,7 @@ Addon nativo para MK-Auth que permite ao agente escolher um cliente, adicionar u
 ## Tabelas
 
 - `tv_plans`: planos adicionais de TV.
-- `client_tv_plans`: vinculo cliente MK-Auth -> plano TV -> linha XUI.
+- `client_tv_plans`: vinculo cliente MK-Auth -> plano TV -> linha XUI, com overrides de telas/conexoes e outputs.
 - `settings`: credenciais e preferencias XUI.
 - `sync_logs`: historico operacional.
 
