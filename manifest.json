@@ -1,0 +1,7 @@
+{
+  "name": "TV Canais",
+  "version": "1.0.7",
+  "author": "Codex",
+  "description": "Addon MK-Auth para vincular clientes a planos adicionais de TV e sincronizar bloqueio com a plataforma de canais.",
+  "entry": "index.php"
+}
