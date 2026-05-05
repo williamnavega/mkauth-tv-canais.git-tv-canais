@@ -841,15 +841,58 @@ function tv_xui_line_payload(array $client, array $plan, $username, $password, a
 
 function tv_xui_response_id($response, $fallback = '')
 {
-    if (is_array($response)) {
-        if (isset($response['data']) && is_array($response['data']) && isset($response['data']['id'])) {
-            return (string) $response['data']['id'];
-        }
-        if (isset($response['id'])) {
-            return (string) $response['id'];
+    $id = tv_xui_find_id_value($response);
+    return $id !== '' ? $id : (string) $fallback;
+}
+
+function tv_xui_find_id_value($value)
+{
+    if (!is_array($value)) {
+        return '';
+    }
+
+    $keys = array('id', 'line_id', 'user_id', 'member_id', 'created_id', 'insert_id', 'stream_id');
+    foreach ($keys as $key) {
+        if (isset($value[$key])) {
+            $candidate = trim((string) $value[$key]);
+            if ($candidate !== '' && $candidate !== '0') {
+                return $candidate;
+            }
         }
     }
-    return (string) $fallback;
+
+    foreach (array('data', 'result', 'response', 'line', 'user', 'created', 'record') as $key) {
+        if (isset($value[$key]) && is_array($value[$key])) {
+            $candidate = tv_xui_find_id_value($value[$key]);
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+    }
+
+    foreach ($value as $item) {
+        if (is_array($item)) {
+            $candidate = tv_xui_find_id_value($item);
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+    }
+
+    return '';
+}
+
+function tv_xui_response_summary($response)
+{
+    if (!is_array($response)) {
+        return 'resposta vazia ou nao estruturada';
+    }
+    foreach (array('message', 'msg', 'error', 'status', 'result') as $key) {
+        if (isset($response[$key]) && !is_array($response[$key])) {
+            return substr($key . '=' . (string) $response[$key], 0, 180);
+        }
+    }
+    return substr(json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 0, 180);
 }
 
 function tv_sync_client($linkId)
@@ -904,7 +947,14 @@ function tv_sync_client($linkId)
         $response = tv_xui_request('create_line', $payload, 'POST');
         $lineId = tv_xui_response_id($response, '');
         if ($lineId === '') {
-            throw new RuntimeException('XUI nao retornou ID da linha criada.');
+            $found = tv_xui_find_line($username);
+            if ($found) {
+                $lineId = tv_xui_response_id($found, '');
+            }
+        }
+        if ($lineId === '') {
+            tv_log((int) $link['id'], (int) $client['id'], 'create_line', 'failed_id', 'XUI criou/recebeu a linha mas nao retornou ID.', $response);
+            throw new RuntimeException('XUI nao retornou ID da linha criada. Resumo: ' . tv_xui_response_summary($response));
         }
     }
 
