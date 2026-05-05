@@ -211,6 +211,7 @@
 
   function bindForms() {
     const licenseForm = byId('license-form');
+    const activationOnly = licenseForm && !byId('assign-form');
     if (licenseForm) {
       licenseForm.addEventListener('submit', function (event) {
         event.preventDefault();
@@ -222,7 +223,7 @@
           })
           .catch((error) => setStatus(false, error.message));
       });
-      return true;
+      if (activationOnly) return true;
     }
 
     const search = byId('client-search');
