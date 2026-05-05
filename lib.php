@@ -895,6 +895,14 @@ function tv_xui_response_summary($response)
     return substr(json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 0, 180);
 }
 
+function tv_mark_link_failed(mysqli $db, array $link, array $client, $action, $message, $raw = array())
+{
+    $message = substr((string) $message, 0, 255);
+    $params = array('failed', $message, (int) $link['id']);
+    tv_exec($db, 'UPDATE client_tv_plans SET status = ?, last_message = ?, updated_at = NOW() WHERE id = ?', 'ssi', $params);
+    tv_log((int) $link['id'], (int) $client['id'], $action, 'failed', $message, is_array($raw) ? $raw : array('raw' => $raw));
+}
+
 function tv_sync_client($linkId)
 {
     $app = tv_app_db();
@@ -953,8 +961,12 @@ function tv_sync_client($linkId)
             }
         }
         if ($lineId === '') {
-            tv_log((int) $link['id'], (int) $client['id'], 'create_line', 'failed_id', 'XUI criou/recebeu a linha mas nao retornou ID.', $response);
-            throw new RuntimeException('XUI nao retornou ID da linha criada. Resumo: ' . tv_xui_response_summary($response));
+            $summary = tv_xui_response_summary($response);
+            $message = stripos($summary, 'Invalid API key') !== false
+                ? 'API key invalida no painel de canais. Corrija em Configuracao.'
+                : 'XUI nao retornou ID da linha criada. Resumo: ' . $summary;
+            tv_mark_link_failed($app, $link, $client, 'create_line', $message, $response);
+            throw new RuntimeException($message);
         }
     }
 
