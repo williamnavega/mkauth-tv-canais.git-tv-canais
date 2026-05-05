@@ -895,6 +895,11 @@ function tv_xui_response_summary($response)
     return substr(json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 0, 180);
 }
 
+function tv_xui_response_status($response)
+{
+    return is_array($response) && isset($response['status']) ? strtoupper(trim((string) $response['status'])) : '';
+}
+
 function tv_mark_link_failed(mysqli $db, array $link, array $client, $action, $message, $raw = array())
 {
     $message = substr((string) $message, 0, 255);
@@ -953,6 +958,11 @@ function tv_sync_client($linkId)
         $lineId = tv_xui_response_id($response, $lineId);
     } else {
         $response = tv_xui_request('create_line', $payload, 'POST');
+        if (tv_xui_response_status($response) === 'STATUS_INVALID_DATE' && isset($payload['exp_date'])) {
+            tv_log((int) $link['id'], (int) $client['id'], 'create_line', 'retry_without_exp_date', 'XUI recusou exp_date; reenviando sem validade.', $response);
+            unset($payload['exp_date']);
+            $response = tv_xui_request('create_line', $payload, 'POST');
+        }
         $lineId = tv_xui_response_id($response, '');
         if ($lineId === '') {
             $found = tv_xui_find_line($username);
